@@ -1,28 +1,40 @@
 // import * as express from "express";
 import express from "express";
+import cors from "cors";
 import path from "path";
 import fs from "fs/promises";
+import { PatientOrderRetrievalController } from "./router";
+import { PGPatientOrderRepository } from "./repository";
 
 require('dotenv').config();
-let serverPort = process.argv[2];
-// console.log("PORT:", serverPort);
-
+let serverPort = process.argv[3];
 
 const app = express();
+const port = serverPort || process.env.PORT || 5000;
+const repo = new PGPatientOrderRepository("test_role", "localhost", "patient_order_db", "getwellsoon", 5432);
+const patientOrderController = new PatientOrderRetrievalController(repo);
 
-// Serve the static files from the React app
-app.get('/', (req,res) =>{
+app.use(cors({origin: [`localhost:${port}`]}));
+
+app.get('/', (req, res) =>{
     console.log("Got request");
     res.status(200);
     res.send();
 });
 
-app.get('/builder', (req,res) =>{
-    // console.log("Builder request");
-    res.sendFile(path.join(path.resolve(__dirname, ".."), '/index.html'));
-});
+app.use("/api", patientOrderController.getRouter());
 
-const port = serverPort || process.env.PORT || 5000;
-app.listen(port);
 
+
+const server = app.listen(port);
 console.log('App is listening on port ' + port);
+
+
+process.on("SIGINT", () => {
+    console.log("Arrest Signal");
+    server.close();
+    patientOrderController.wrapUp().finally(()=>{
+        console.log("wrapped up closing process");
+        process.exit(0)
+    });
+});

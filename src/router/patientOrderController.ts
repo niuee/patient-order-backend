@@ -1,15 +1,17 @@
 import express from "express";
 import { Router } from "express";
-import { PatientOrderRepository, PatientOrderRepositoryError } from "../repository";
+import { PatientOrderRepository, PatientOrderQueryOnlyRepository, PatientOrderRepositoryError } from "../repository";
 
 export class PatientOrderRetrievalController{
     
     private patientOrderRepository: PatientOrderRepository;
+    private patientOrderQueryRepository: PatientOrderQueryOnlyRepository;
     private router: Router;
 
-    constructor(patientOrderRepository: PatientOrderRepository){
+    constructor(patientOrderRepository: PatientOrderRepository, patientOrderQueryOnlyRepository: PatientOrderQueryOnlyRepository){
         this.router = express.Router();
         this.patientOrderRepository = patientOrderRepository;
+        this.patientOrderQueryRepository = patientOrderQueryOnlyRepository;
         this.setUpRouter();
     }
 
@@ -20,10 +22,19 @@ export class PatientOrderRetrievalController{
     setUpRouter(){
         this.router.use(express.json());
 
+        this.router.get("/patients", async (req, res)=>{
+            try{
+                const patients = await this.patientOrderQueryRepository.getPatients();
+                res.status(200).json(patients);
+            } catch (e){
+                res.status(500).send();
+            }
+        });
+
         this.router.get("/patient/:id", async (req, res)=>{
             const patientId = req.params.id;
             try{
-                const patient = await this.patientOrderRepository.getPatient(patientId);
+                const patient = await this.patientOrderQueryRepository.getPatient(patientId);
                 if (patient == undefined){
                     res.status(404).send({msg: `patient with patient id ${patientId} not found`});
                 } else {
@@ -64,11 +75,11 @@ export class PatientOrderRetrievalController{
         this.router.get("/patientOrders/:patientId", async (req, res)=>{
             const patientId = req.params.patientId;
             try{
-                const patient = await this.patientOrderRepository.getPatient(patientId);
+                const patient = await this.patientOrderQueryRepository.getPatient(patientId);
                 if (patient == undefined){
                     res.status(404).send({msg: `patient with patient id ${patientId} not found`});
                 } else {
-                    const orders = await this.patientOrderRepository.getOrdersForPatient(patientId);
+                    const orders = await this.patientOrderQueryRepository.getOrdersForPatient(patientId);
                     res.status(200).json(orders);
                 }
             } catch(e){
@@ -107,26 +118,6 @@ export class PatientOrderRetrievalController{
             }
         });
 
-        // this.router.put("/order", async (req, res)=>{
-        //     const body = req.body;
-        //     if (body.orderId == undefined){
-        //         res.status(404).send({msg: "no order id provided"});
-        //         return;
-        //     }
-        //     if (body.message == undefined){
-        //         res.status(404).send({msg: "no order message provided"});
-        //         return;
-        //     }
-        //     const orderId = body.orderId;
-        //     const message = body.message;
-        //     try{
-        //         await this.patientOrderRepository.editOrder(orderId, message);
-        //         res.status(200).send();
-        //     } catch(e){
-        //         res.status(500).send();
-        //         return;
-        //     }
-        // });
     }
 
     async wrapUp(){

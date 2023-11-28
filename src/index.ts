@@ -4,7 +4,7 @@ import cors from "cors";
 import path from "path";
 import fs from "fs/promises";
 import { PatientOrderRetrievalController } from "./router";
-import { PGPatientOrderRepository } from "./repository";
+import { PGPatientOrderRepository, PGPatientOrderQueryOnlyRepository } from "./repository";
 
 require('dotenv').config();
 let serverPort = process.argv[3];
@@ -12,7 +12,8 @@ let serverPort = process.argv[3];
 const app = express();
 const port = serverPort || process.env.PORT || 5000;
 const repo = new PGPatientOrderRepository("test_role", "localhost", "patient_order_db", "getwellsoon", 5432);
-const patientOrderController = new PatientOrderRetrievalController(repo);
+const queryOnlyRepo = new PGPatientOrderQueryOnlyRepository("test_role", "localhost", "patient_order_db", "getwellsoon", 5432);
+const patientOrderController = new PatientOrderRetrievalController(repo, queryOnlyRepo);
 
 app.use(cors({origin: [`localhost:${port}`]}));
 

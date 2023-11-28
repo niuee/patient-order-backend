@@ -1,6 +1,6 @@
 import { Order } from "../../order";
 import { Patient, Sex } from "../../patient";
-import { PatientOrderRepository } from "../repository";
+import { PatientOrderRepository, PatientOrderQueryOnlyRepository, PatientForUI, OrderForUI, OrderHistoryForUI } from "../repository";
 import { Pool } from "pg";
 
 export class PGPatientOrderRepository implements PatientOrderRepository{
@@ -179,6 +179,142 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
     async closePool(){
         await this.dbPool.end();
     }
+
+}
+
+export class PGPatientOrderQueryOnlyRepository implements PatientOrderQueryOnlyRepository {
+
+    private dbPool: Pool;
+
+    constructor(dbUser: string, dbHost: string, dbDatabase: string, dbPassword: string, dbPort: number){
+        this.dbPool = new Pool({
+            user: dbUser,
+            host: dbHost,
+            database: dbDatabase,
+            password: dbPassword,
+            port: dbPort,
+            max: 5
+        });
+    }
+
+    async getPatients(): Promise<PatientForUI[]> {
+        const res: PatientForUI[] = [];
+        const client = await this.dbPool.connect();
+        try {
+            await client.query('BEGIN');
+            const queryResult = await client.query(`SELECT * FROM public.patients`);
+            const queriedRow = queryResult.rows;
+            queriedRow.forEach((row)=>{
+                res.push({
+                    id: row.id,
+                    lastName: row['last_name'],
+                    firstName: row['first_name'],
+                    sex: row['sex'],
+                    birthDate: row['birth_date']
+                });
+            })
+            await client.query('COMMIT');
+        } catch(e){
+            await client.query('ROLLBACK');
+            throw e;
+        } finally{
+            client.release();
+            return res;
+        }
+    }
+
+    async getPatient(patientId: string): Promise<PatientForUI | undefined>{
+        let res: PatientForUI = undefined;
+        const client = await this.dbPool.connect();
+        try {
+            await client.query('BEGIN');
+            const queryResult = await client.query(`SELECT * FROM public.patients WHERE id=($1)`, [patientId]);
+            await client.query('COMMIT');
+            if (queryResult.rowCount == 0){
+                return res;
+            }
+            const queriedRow = queryResult.rows[0];
+            res = {
+                id: queriedRow.id,
+                lastName: queriedRow['last_name'],
+                firstName: queriedRow['first_name'],
+                sex: queriedRow['sex'],
+                birthDate: queriedRow['birth_date']
+            };
+        } catch(e){
+            await client.query('ROLLBACK');
+            if (e.code == '22P02'){
+                throw new PatientOrderRepositoryError("patient id invalid", "1121");
+            }
+            throw e;
+        } finally{
+            client.release();
+            return res;
+        }
+    }
+
+    async getOrdersForPatient(patientId: string): Promise<OrderForUI[]> {
+        const res: OrderForUI[] = [];
+        const client = await this.dbPool.connect();
+        try {
+            await client.query('BEGIN');
+            const queryResult = await client.query('SELECT id FROM public.orders WHERE patient_id=($1)', [patientId]);
+            const queriedRow = queryResult.rows;
+            queriedRow.forEach(async (row)=>{
+                const editCounts = await client.query('SELECT COUNT(*) FROM public.messages WHERE order_id=($1)', [row.id]);
+                const orderQuery = await client.query('SELECT content, entry_date FROM public.messages WHERE order_id=($1) ORDER BY entry_date DESC LIMIT 1', [row.id]);
+                if (orderQuery.rowCount >= 1){
+                    const specificOrder = orderQuery.rows[0];
+                    res.push(
+                    {
+                        id: row.id, 
+                        message: specificOrder.content, 
+                        lastEditDate: specificOrder['entry_date'],
+                        hasBeenEdited: (+editCounts.rows[0].count) > 1
+                    });
+                }
+            });
+            await client.query('COMMIT');
+        } catch(e){
+            await client.query('ROLLBACK');
+            throw e;
+        } finally{
+            client.release();
+            return res;
+        }
+    }
+
+    async getOrderHistory(orderId: string): Promise<OrderHistoryForUI>{
+        const res: OrderHistoryForUI = {
+            id: orderId,
+            pastEdits: [],
+        };
+        const client = await this.dbPool.connect();
+        try {
+            await client.query('BEGIN');
+            const queryResult = await client.query('SELECT id, content, entry_date FROM public.messages WHERE order_id=($1) ORDER BY entry_date DESC', [orderId]);
+            const queriedRow = queryResult.rows;
+            queriedRow.forEach(async (row)=>{
+                res.pastEdits.push({id: row.id, content: row.content, entryDate: row['entry_date']});
+            });
+            await client.query('COMMIT');
+        } catch(e){
+            await client.query('ROLLBACK');
+            throw e;
+        } finally{
+            client.release();
+            return res;
+        }
+    }
+
+    async wrapUp(){
+        await this.closePool();
+    }
+
+    async closePool(){
+        await this.dbPool.end();
+    }
+
 
 }
 

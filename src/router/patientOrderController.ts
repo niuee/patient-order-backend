@@ -1,6 +1,6 @@
 import express from "express";
 import { Router } from "express";
-import { PatientOrderRepository } from "../repository";
+import { PatientOrderRepository, PatientOrderRepositoryError } from "../repository";
 
 export class PatientOrderRetrievalController{
     
@@ -45,51 +45,61 @@ export class PatientOrderRetrievalController{
                     res.status(200).json(orders);
                 }
             } catch(e){
+                if (e instanceof PatientOrderRepositoryError){
+                    // e.getCode();
+                    res.status(400).json({msg: e.message});
+                }
                 res.status(500).send();
             }
         });
 
         this.router.post("/order", async (req, res)=>{
             const body = req.body;
-            if (body.patientId == undefined){
-                res.status(404).send({msg: "no patient id provided"});
-                return;
-            }
             if (body.message == undefined){
-                res.status(404).send({msg: "no order message provided"});
+                res.status(400).send({msg: "no order message provided"});
                 return;
             }
             const patientId = body.patientId;
+            const orderId = body.orderId;
             const message = body.message;
             try{
-                await this.patientOrderRepository.insertOrderForPatient(patientId, message);
-                res.status(200).send();
+                if (patientId !== undefined){
+                    await this.patientOrderRepository.insertOrderForPatient(patientId, message);
+                    res.status(200).send();
+                    return;
+                }
+                if (orderId !== undefined){
+                    await this.patientOrderRepository.editOrder(orderId, message);
+                    res.status(200).send();
+                    return;
+                }
+                res.status(404).json({msg: 'either provide the patient id to insert new order or the order id to edit existing order'});
             } catch(e){
                 res.status(500).send();
                 return;
             }
         });
 
-        this.router.put("/order", async (req, res)=>{
-            const body = req.body;
-            if (body.orderId == undefined){
-                res.status(404).send({msg: "no order id provided"});
-                return;
-            }
-            if (body.message == undefined){
-                res.status(404).send({msg: "no order message provided"});
-                return;
-            }
-            const orderId = body.orderId;
-            const message = body.message;
-            try{
-                await this.patientOrderRepository.editOrder(orderId, message);
-                res.status(200).send();
-            } catch(e){
-                res.status(500).send();
-                return;
-            }
-        });
+        // this.router.put("/order", async (req, res)=>{
+        //     const body = req.body;
+        //     if (body.orderId == undefined){
+        //         res.status(404).send({msg: "no order id provided"});
+        //         return;
+        //     }
+        //     if (body.message == undefined){
+        //         res.status(404).send({msg: "no order message provided"});
+        //         return;
+        //     }
+        //     const orderId = body.orderId;
+        //     const message = body.message;
+        //     try{
+        //         await this.patientOrderRepository.editOrder(orderId, message);
+        //         res.status(200).send();
+        //     } catch(e){
+        //         res.status(500).send();
+        //         return;
+        //     }
+        // });
     }
 
     async wrapUp(){

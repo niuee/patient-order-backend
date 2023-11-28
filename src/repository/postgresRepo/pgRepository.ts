@@ -93,6 +93,15 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
             await client.query('COMMIT');
         } catch(e){
             await client.query('ROLLBACK');
+            // console.log(e);
+            // console.log(e instanceof Error);
+            // console.log(e.detail);
+            if (e.code == '22P02'){
+                throw new PatientOrderRepositoryError("patient id invalid", "1121");
+            }
+            if (e.code == '23503'){
+                throw new PatientOrderRepositoryError("patient with the patient id does not exist", "1120");
+            }
             throw e;
         } finally{
             client.release();
@@ -107,6 +116,12 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
             await client.query('COMMIT');
         } catch(e){
             await client.query('ROLLBACK');
+            if (e.code == '23503'){
+                throw new PatientOrderRepositoryError("order id does not correspond to an existing order", "1110");
+            }
+            // console.log(e);
+            // console.log(e instanceof Error);
+            // console.log(e.detail);
             throw e;
         } finally{
             client.release();
@@ -127,6 +142,9 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
             res = new Patient(queriedRow.id, queriedRow["first_name"], queriedRow["last_name"]);
         } catch(e){
             await client.query('ROLLBACK');
+            if (e.code == '22P02'){
+                throw new PatientOrderRepositoryError("patient id invalid", "1121");
+            }
             throw e;
         } finally{
             client.release();
@@ -142,4 +160,19 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
         await this.dbPool.end();
     }
 
+}
+
+
+export class PatientOrderRepositoryError extends Error {
+
+    private code: string;
+
+    constructor(message: string, code: string){
+        super(message);
+        this.code = code;
+    }
+
+    getCode(): string{
+        return this.code;
+    }
 }

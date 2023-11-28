@@ -65,7 +65,7 @@ export class PatientOrderRetrievalController{
             }
             try{
                 const birthDate = new Date(body.birthDate + "T00:00:00.000+08:00");
-                await this.patientOrderRepository.insertPatient(body.firstName, body.lastName, body.sex, body.birthDate);
+                await this.patientOrderRepository.insertPatient(body.firstName, body.lastName, body.sex, birthDate);
                 res.status(200).send();
             } catch(e){
                 res.status(500).send();

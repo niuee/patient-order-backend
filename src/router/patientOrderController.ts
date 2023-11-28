@@ -34,6 +34,33 @@ export class PatientOrderRetrievalController{
             }
         });
 
+        this.router.post("/patient", async(req, res)=>{
+            const body = req.body;
+            if (body.lastName == undefined) {
+                res.status(400).json({msg: "patient's last name not provided"});
+                return;
+            }
+            if (body.firstName == undefined) {
+                res.status(400).json({msg: "patient's first name not provided"});
+                return;
+            }
+            if (body.sex == undefined) {
+                res.status(400).json({msg: "patient's sex not provided"});
+                return;
+            }
+            if (body.birthDate == undefined) {
+                res.status(400).json({msg: "patient's birth date not provided"});
+                return;
+            }
+            try{
+                const birthDate = new Date(body.birthDate + "T00:00:00.000+08:00");
+                await this.patientOrderRepository.insertPatient(body.firstName, body.lastName, body.sex, body.birthDate);
+                res.status(200).send();
+            } catch(e){
+                res.status(500).send();
+            }
+        });
+
         this.router.get("/patientOrders/:patientId", async (req, res)=>{
             const patientId = req.params.patientId;
             try{

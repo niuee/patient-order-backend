@@ -1,5 +1,5 @@
 import { Order } from "../../order";
-import { Patient } from "../../patient";
+import { Patient, Sex } from "../../patient";
 import { PatientOrderRepository } from "../repository";
 import { Pool } from "pg";
 
@@ -23,10 +23,10 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
         const client = await this.dbPool.connect();
         try {
             await client.query('BEGIN');
-            const queryResult = await this.dbPool.query(`SELECT * FROM public.patients`);
+            const queryResult = await client.query(`SELECT * FROM public.patients`);
             const queriedRow = queryResult.rows;
             queriedRow.forEach((row)=>{
-                res.push(new Patient(row.id, row['first_name'], row['last_name']));
+                res.push(new Patient(row.id, row['first_name'], row['last_name'], row['sex'] == 'M' ? Sex.M : Sex.F, row['birth_date']));
             })
             await client.query('COMMIT');
         } catch(e){
@@ -133,13 +133,13 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
         const client = await this.dbPool.connect();
         try {
             await client.query('BEGIN');
-            const queryResult = await this.dbPool.query(`SELECT * FROM public.patients WHERE id=($1)`, [patientId]);
+            const queryResult = await client.query(`SELECT * FROM public.patients WHERE id=($1)`, [patientId]);
             await client.query('COMMIT');
             if (queryResult.rowCount == 0){
                 return res;
             }
             const queriedRow = queryResult.rows[0];
-            res = new Patient(queriedRow.id, queriedRow["first_name"], queriedRow["last_name"]);
+            res = new Patient(queriedRow.id, queriedRow["first_name"], queriedRow["last_name"], queriedRow['sex'] == "M" ? Sex.M : Sex.F, queriedRow['birth_date']);
         } catch(e){
             await client.query('ROLLBACK');
             if (e.code == '22P02'){
@@ -149,6 +149,26 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
         } finally{
             client.release();
             return res;
+        }
+    }
+
+    async insertPatient(firstName: string, lastName: string, sex: string, birthDate: Date){
+        const client = await this.dbPool.connect();
+        sex = sex.toLowerCase();
+        if (sex == "m" || sex == "male"){
+            sex = "M";
+        } else if (sex == "f" || sex == "female"){
+            sex = "F";
+        }
+        try {
+            await client.query('BEGIN');
+            await client.query(`INSERT INTO patients (last_name, first_name, sex, birth_date) VALUES($1, $2, $3, $4)`, [lastName, firstName, sex, birthDate]);
+            await client.query('COMMIT');
+        } catch(e){
+            await client.query('ROLLBACK');
+            throw e;
+        } finally{
+            client.release();
         }
     }
 

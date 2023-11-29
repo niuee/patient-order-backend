@@ -11,11 +11,11 @@ let serverPort = process.argv[3];
 
 const app = express();
 const port = serverPort || process.env.PORT || 5000;
-const repo = new PGPatientOrderRepository("test_role", "localhost", "patient_order_db", "getwellsoon", 5432);
-const queryOnlyRepo = new PGPatientOrderQueryOnlyRepository("test_role", "localhost", "patient_order_db", "getwellsoon", 5432);
+const repo = new PGPatientOrderRepository("test_role", "192.168.1.5", "patient_order_db", "getwellsoon", 5432);
+const queryOnlyRepo = new PGPatientOrderQueryOnlyRepository("test_role", "192.168.1.5", "patient_order_db", "getwellsoon", 5432);
 const patientOrderController = new PatientOrderRetrievalController(repo, queryOnlyRepo);
 
-let allowedOrigins = ['http://localhost:8081', 'http://localhost:5502'];
+let allowedOrigins = ['http://localhost:8081', 'http://localhost:5502', 'https://vntchang.dev'];
 app.use(cors({
   origin: function(origin, callback){
     // allow requests with no origin 
@@ -31,7 +31,6 @@ app.use(cors({
 }));
 
 app.get('/', (req, res) =>{
-    console.log("Got request");
     res.status(200);
     res.send();
 });

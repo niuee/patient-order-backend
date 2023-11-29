@@ -72,6 +72,20 @@ export class PatientOrderRetrievalController{
             }
         });
 
+        this.router.get("/orderHistory/:orderId", async(req, res)=>{
+            const orderId = req.params.orderId;
+            try{
+                const orderHistory = await this.patientOrderQueryRepository.getOrderHistory(orderId);
+                res.status(200).json(orderHistory);
+            } catch (e){
+                if (e instanceof PatientOrderRepositoryError && e.getCode() == "1110"){
+                    res.status(400).json({msg: e.message});
+                } else{
+                    res.status(500).send();
+                }
+            }
+        })
+
         this.router.get("/patientOrders/:patientId", async (req, res)=>{
             const patientId = req.params.patientId;
             try{
@@ -93,7 +107,7 @@ export class PatientOrderRetrievalController{
 
         this.router.post("/order", async (req, res)=>{
             const body = req.body;
-            if (body.message == undefined){
+            if (body.message == undefined || body.message == ""){
                 res.status(400).send({msg: "no order message provided"});
                 return;
             }

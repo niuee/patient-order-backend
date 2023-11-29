@@ -117,7 +117,7 @@ export class PGPatientOrderRepository implements PatientOrderRepository{
         } catch(e){
             await client.query('ROLLBACK');
             if (e.code == '23503'){
-                throw new PatientOrderRepositoryError("order id does not correspond to an existing order", "1110");
+                throw new PatientOrderRepositoryError(`order with order id ${orderId} does not exist`, "1110");
             }
             // console.log(e);
             // console.log(e instanceof Error);
@@ -260,11 +260,12 @@ export class PGPatientOrderQueryOnlyRepository implements PatientOrderQueryOnlyR
             await client.query('BEGIN');
             const queryResult = await client.query('SELECT id FROM public.orders WHERE patient_id=($1)', [patientId]);
             const queriedRow = queryResult.rows;
-            queriedRow.forEach(async (row)=>{
+            for(const row of queriedRow){
                 const editCounts = await client.query('SELECT COUNT(*) FROM public.messages WHERE order_id=($1)', [row.id]);
                 const orderQuery = await client.query('SELECT content, entry_date FROM public.messages WHERE order_id=($1) ORDER BY entry_date DESC LIMIT 1', [row.id]);
                 if (orderQuery.rowCount >= 1){
                     const specificOrder = orderQuery.rows[0];
+                    // console.log(specificOrder);
                     res.push(
                     {
                         id: row.id, 
@@ -273,13 +274,14 @@ export class PGPatientOrderQueryOnlyRepository implements PatientOrderQueryOnlyR
                         hasBeenEdited: (+editCounts.rows[0].count) > 1
                     });
                 }
-            });
+            }
             await client.query('COMMIT');
         } catch(e){
             await client.query('ROLLBACK');
             throw e;
         } finally{
             client.release();
+            // console.log("res", res);
             return res;
         }
     }
@@ -292,9 +294,13 @@ export class PGPatientOrderQueryOnlyRepository implements PatientOrderQueryOnlyR
         const client = await this.dbPool.connect();
         try {
             await client.query('BEGIN');
+            const checkOrderExist = await client.query('SELECT COUNT(*) FROM public.orders WHERE id=($1)', [orderId]);
+            if (checkOrderExist.rowCount == 0){
+                throw new PatientOrderRepositoryError(`order with order id ${orderId} does not exist`, "1110");
+            } 
             const queryResult = await client.query('SELECT id, content, entry_date FROM public.messages WHERE order_id=($1) ORDER BY entry_date DESC', [orderId]);
             const queriedRow = queryResult.rows;
-            queriedRow.forEach(async (row)=>{
+            queriedRow.forEach((row)=>{
                 res.pastEdits.push({id: row.id, content: row.content, entryDate: row['entry_date']});
             });
             await client.query('COMMIT');

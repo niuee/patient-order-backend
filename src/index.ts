@@ -15,7 +15,20 @@ const repo = new PGPatientOrderRepository("test_role", "localhost", "patient_ord
 const queryOnlyRepo = new PGPatientOrderQueryOnlyRepository("test_role", "localhost", "patient_order_db", "getwellsoon", 5432);
 const patientOrderController = new PatientOrderRetrievalController(repo, queryOnlyRepo);
 
-app.use(cors({origin: [`localhost:${port}`]}));
+let allowedOrigins = ['http://localhost:8081', 'http://localhost:5502'];
+app.use(cors({
+  origin: function(origin, callback){
+    // allow requests with no origin 
+    // (like mobile apps or curl requests)
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      var msg = 'The CORS policy for this site does not ' +
+                'allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  }
+}));
 
 app.get('/', (req, res) =>{
     console.log("Got request");
